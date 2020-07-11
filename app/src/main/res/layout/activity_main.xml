@@ -19,6 +19,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:ems="10"
+        android:gravity="top"
         android:hint="@string/sms_text"
         android:inputType="textMultiLine|text"
         android:lines="6" />
@@ -28,5 +29,17 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/button" />
+
+    <TextView
+        android:id="@+id/textViewSent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        tools:text="SMS Sent" />
+
+    <TextView
+        android:id="@+id/textViewRecieved"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        tools:text="SMS Recieved" />
 
 </LinearLayout>
