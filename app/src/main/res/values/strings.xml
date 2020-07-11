@@ -1,6 +1,8 @@
 <resources>
     <string name="app_name">My Application</string>
-    <string name="button">Button</string>
+    <string name="button">Send SMS</string>
     <string name="sms_text">SMS text</string>
     <string name="phonenumber">PhoneNumber</string>
+    <string name="wrong_phone_number">wrong phone number</string>
+    <string name="no_smsmanager">No SmsManager</string>
 </resources>

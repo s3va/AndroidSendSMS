@@ -12,10 +12,10 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import kotlinx.android.synthetic.main.activity_main.*
 
-private const val REQUEST_CODE_PERMISSIONS = 10
+/*private const val REQUEST_CODE_PERMISSIONS = 10
 private val REQUIRED_PERMISSIONS = arrayOf(
     Manifest.permission.SEND_SMS
-)
+)*/
 
 
 class MainActivity : AppCompatActivity() {
@@ -33,59 +33,80 @@ class MainActivity : AppCompatActivity() {
 // system permissions dialog. Save the return value, an instance of
 // ActivityResultLauncher. You can use either a val, as shown in this snippet,
 // or a lateinit var in your onAttach() or onCreate() method.
-        button.isEnabled=false
 
-        val requestPermissionLauncher =
-            registerForActivityResult(
-                ActivityResultContracts.RequestPermission()
-            ) {
-                if (it) {
-                    Log.d("RequestPermission","********************************* it=$it *******************************")
-                    Toast.makeText(applicationContext,"permission granted",Toast.LENGTH_LONG).show()
-                    proggy()
-                    // Permission is granted. Continue the action or workflow in your
-                    // app.
-                } else {
-                    Log.d("RequestPermission","******************************** else it=$it **************************")
-                    Toast.makeText(applicationContext,"cannot send SMS without your permission",Toast.LENGTH_LONG).show()
-                    // Explain to the user that the feature is unavailable because the
-                    // features requires a permission that the user has denied. At the
-                    // same time, respect the user's decision. Don't link to system
-                    // settings in an effort to convince the user to change their
-                    // decision.
-                }
-            }
-
-
+        button.isEnabled = false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+
+            val requestPermissionLauncher =
+                registerForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) {
+                    if (it) {
+                        Log.d(
+                            "RequestPermission",
+                            "********************************* it=$it *******************************"
+                        )
+                        Toast.makeText(applicationContext, "permission granted", Toast.LENGTH_LONG)
+                            .show()
+                        proggy()
+                        // Permission is granted. Continue the action or workflow in your
+                        // app.
+                    } else {
+                        Log.d(
+                            "RequestPermission",
+                            "******************************** else it=$it **************************"
+                        )
+                        Toast.makeText(
+                            applicationContext,
+                            "cannot send SMS without your permission",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        // Explain to the user that the feature is unavailable because the
+                        // features requires a permission that the user has denied. At the
+                        // same time, respect the user's decision. Don't link to system
+                        // settings in an effort to convince the user to change their
+                        // decision.
+                    }
+                }
+
+
             when {
                 ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.SEND_SMS
                 ) == PackageManager.PERMISSION_GRANTED -> {
                     // You can use the API that requires the permission.
-                    Log.d("checkSelfPermission","PackageManager.PERMISSION_GRANTED")
+                    Log.d("checkSelfPermission", "PackageManager.PERMISSION_GRANTED")
                     proggy()
                 }
                 shouldShowRequestPermissionRationale(Manifest.permission.SEND_SMS) -> {
-                // In an educational UI, explain to the user why your app requires this
-                // permission for a specific feature to behave as expected. In this UI,
-                // include a "cancel" or "no thanks" button that allows the user to
-                // continue using your app without granting the permission.
-                    Toast.makeText(applicationContext,"Proggy needs your permission to send SMS",Toast.LENGTH_LONG).show()
-                    Log.d("Rational","fucking Rationaly")
+                    // In an educational UI, explain to the user why your app requires this
+                    // permission for a specific feature to behave as expected. In this UI,
+                    // include a "cancel" or "no thanks" button that allows the user to
+                    // continue using your app without granting the permission.
+                    Toast.makeText(
+                        applicationContext,
+                        "Proggy needs your permission to send SMS",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    Log.d("Rational", "fucking Rationaly")
                     //showInContextUI()
 
                 }
                 else -> {
-                    Log.d("runRequestPer","requestPermissionLauncher.launch( Manifest.permission.SEND_SMS)")
+                    Log.d(
+                        "runRequestPer",
+                        "requestPermissionLauncher.launch( Manifest.permission.SEND_SMS)"
+                    )
                     // You can directly ask for the permission.
                     // The registered ActivityResultCallback gets the result of this request.
                     requestPermissionLauncher.launch(
-                        Manifest.permission.SEND_SMS)
+                        Manifest.permission.SEND_SMS
+                    )
                 }
             }
-        }
+        } else
+            proggy()
 
 
     }
@@ -108,13 +129,25 @@ class MainActivity : AppCompatActivity() {
     //            }
 */
 
-            val smsManager: SmsManager = SmsManager.getDefault()
-            smsManager.sendTextMessage(
-                editTextTextPhoneNumber.text.toString(),
-                null,
-                editTextText.text.toString(),
-                null, null
-            )
+
+            if(editTextText.text.toString().isNullOrBlank()){
+                Toast.makeText(this,"Empty text of message. Cannot send empty sms",Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            if ((!editTextTextPhoneNumber.text.toString().isNullOrBlank()) and editTextTextPhoneNumber.text.toString().matches("^\\+?[0-9][0-9 \\-()]*".toRegex())) {
+                val smsManager: SmsManager? = SmsManager.getDefault()
+                if(smsManager == null)
+                    Toast.makeText(this,getString(R.string.no_smsmanager),Toast.LENGTH_LONG).show()
+                smsManager?.sendTextMessage(
+                    editTextTextPhoneNumber.text.toString(),
+                    null,
+                    editTextText.text.toString(),
+                    null, null
+                )
+
+            } else {
+                Toast.makeText(this,getString(R.string.wrong_phone_number),Toast.LENGTH_LONG).show()
+            }
         }
     }
 
