@@ -12,7 +12,12 @@ import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.telephony.SmsManager
+import android.telephony.SubscriptionInfo
+import android.telephony.SubscriptionManager
 import android.util.Log
+import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -20,16 +25,22 @@ import androidx.core.content.ContextCompat
 import kotlinx.android.synthetic.main.activity_main.*
 
 
-/*private const val REQUEST_CODE_PERMISSIONS = 10
+//private const val REQUEST_CODE_PERMISSIONS = 10
 private val REQUIRED_PERMISSIONS = arrayOf(
-    Manifest.permission.SEND_SMS
-)*/
+    Manifest.permission.SEND_SMS,
+    Manifest.permission.READ_PHONE_STATE
+)
 
+const val SENT = "sent"
+const val DELIVERED = "delivered"
 
 class MainActivity : AppCompatActivity() {
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
 
 /*        if (!allPermissionsGranted()) {
             ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
@@ -47,44 +58,60 @@ class MainActivity : AppCompatActivity() {
 
             val requestPermissionLauncher =
                 registerForActivityResult(
-                    ActivityResultContracts.RequestPermission()
+                    ActivityResultContracts.RequestMultiplePermissions()
                 ) {
-                    if (it) {
-                        Log.d(
-                            "RequestPermission",
-                            "********************************* it=$it *******************************"
-                        )
-                        Toast.makeText(applicationContext, "permission granted", Toast.LENGTH_LONG)
-                            .show()
+                    val falsePerm = StringBuilder()
+                    for (m in it.entries) {
+                        if (m.value) {
+                            Log.d(
+                                "SMS_RequestPermission",
+                                "********************************* ${m.key} is ${m.value} *******************************"
+                            )
+                            Toast.makeText(
+                                applicationContext,
+                                "${m.key} permission granted",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            // Permission is granted. Continue the action or workflow in your
+                            // app.
+                        } else {
+                            Log.d(
+                                "SMS_RequestPermission",
+                                "******************************** else ${m.key} is ${m.value} **************************"
+                            )
+                            falsePerm.append("${m.key} ")
+/*                            Toast.makeText(
+                                applicationContext,
+                                "cannot send SMS without your permission ${m.key}",
+                                Toast.LENGTH_SHORT
+                            ).show()*/
+                            // Explain to the user that the feature is unavailable because the
+                            // features requires a permission that the user has denied. At the
+                            // same time, respect the user's decision. Don't link to system
+                            // settings in an effort to convince the user to change their
+                            // decision.
+                        }
+                    }
+                    if (allPermissionsGranted()) {
                         proggy()
-                        // Permission is granted. Continue the action or workflow in your
-                        // app.
                     } else {
-                        Log.d(
-                            "RequestPermission",
-                            "******************************** else it=$it **************************"
-                        )
                         Toast.makeText(
                             applicationContext,
-                            "cannot send SMS without your permission",
-                            Toast.LENGTH_LONG
+                            "cannot send SMS without your permission to $falsePerm",
+                            Toast.LENGTH_SHORT
                         ).show()
-                        // Explain to the user that the feature is unavailable because the
-                        // features requires a permission that the user has denied. At the
-                        // same time, respect the user's decision. Don't link to system
-                        // settings in an effort to convince the user to change their
-                        // decision.
                     }
                 }
 
 
             when {
-                ContextCompat.checkSelfPermission(
+                /*ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.SEND_SMS
-                ) == PackageManager.PERMISSION_GRANTED -> {
+                ) == PackageManager.PERMISSION_GRANTED*/
+                allPermissionsGranted() -> {
                     // You can use the API that requires the permission.
-                    Log.d("checkSelfPermission", "PackageManager.PERMISSION_GRANTED")
+                    Log.d("SMS_checkSelfPermission", "PackageManager.PERMISSION_GRANTED")
                     proggy()
                 }
                 shouldShowRequestPermissionRationale(Manifest.permission.SEND_SMS) -> {
@@ -97,20 +124,19 @@ class MainActivity : AppCompatActivity() {
                         "Proggy needs your permission to send SMS",
                         Toast.LENGTH_LONG
                     ).show()
-                    Log.d("Rational", "fucking Rationaly")
+                    Log.d("SMS_Rational", "fucking Rationaly")
                     //showInContextUI()
+                    requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
 
                 }
                 else -> {
                     Log.d(
-                        "runRequestPer",
+                        "SMS_runRequestPer",
                         "requestPermissionLauncher.launch( Manifest.permission.SEND_SMS)"
                     )
                     // You can directly ask for the permission.
                     // The registered ActivityResultCallback gets the result of this request.
-                    requestPermissionLauncher.launch(
-                        Manifest.permission.SEND_SMS
-                    )
+                    requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
                 }
             }
         } else
@@ -119,11 +145,197 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+    private val delivRecObj = object : BroadcastReceiver() {
+        /**
+         * This method is called when the BroadcastReceiver is receiving an Intent
+         * broadcast.  During this time you can use the other methods on
+         * BroadcastReceiver to view/modify the current result values.  This method
+         * is always called within the main thread of its process, unless you
+         * explicitly asked for it to be scheduled on a different thread using
+         * [android.content.Context.registerReceiver]. When it runs on the main
+         * thread you should
+         * never perform long-running operations in it (there is a timeout of
+         * 10 seconds that the system allows before considering the receiver to
+         * be blocked and a candidate to be killed). You cannot launch a popup dialog
+         * in your implementation of onReceive().
+         *
+         *
+         * **If this BroadcastReceiver was launched through a &lt;receiver&gt; tag,
+         * then the object is no longer alive after returning from this
+         * function.** This means you should not perform any operations that
+         * return a result to you asynchronously. If you need to perform any follow up
+         * background work, schedule a [android.app.job.JobService] with
+         * [android.app.job.JobScheduler].
+         *
+         * If you wish to interact with a service that is already running and previously
+         * bound using [bindService()][android.content.Context.bindService],
+         * you can use [.peekService].
+         *
+         *
+         * The Intent filters used in [android.content.Context.registerReceiver]
+         * and in application manifests are *not* guaranteed to be exclusive. They
+         * are hints to the operating system about how to find suitable recipients. It is
+         * possible for senders to force delivery to specific recipients, bypassing filter
+         * resolution.  For this reason, [onReceive()][.onReceive]
+         * implementations should respond only to known actions, ignoring any unexpected
+         * Intents that they may receive.
+         *
+         * @param context The Context in which the receiver is running.
+         * @param intent The Intent being received.
+         */
+        override fun onReceive(context: Context?, intent: Intent?) {
+
+            var info = "Delivery information: "
+
+            when (resultCode) {
+                Activity.RESULT_OK -> {
+                    info += " delivered "
+                    textViewRecieved.setTextColor(Color.GREEN)
+                }
+                Activity.RESULT_CANCELED -> {
+                    info += " not delivered "
+                    textViewRecieved.setTextColor(Color.RED)
+                }
+            }
+            textViewRecieved.append(info)
+            Toast.makeText(baseContext, info, Toast.LENGTH_SHORT).show()
+
+            /*Toast.makeText(
+                applicationContext, "Deliverd",
+                Toast.LENGTH_LONG
+            ).show()
+            textViewRecieved.text="Delivered"
+            textViewRecieved.setTextColor(Color.GREEN)*/
+        }
+    }
+
+    private val sentRecObj = object : BroadcastReceiver() {
+        /**
+         * This method is called when the BroadcastReceiver is receiving an Intent
+         * broadcast.  During this time you can use the other methods on
+         * BroadcastReceiver to view/modify the current result values.  This method
+         * is always called within the main thread of its process, unless you
+         * explicitly asked for it to be scheduled on a different thread using
+         * [android.content.Context.registerReceiver]. When it runs on the main
+         * thread you should
+         * never perform long-running operations in it (there is a timeout of
+         * 10 seconds that the system allows before considering the receiver to
+         * be blocked and a candidate to be killed). You cannot launch a popup dialog
+         * in your implementation of onReceive().
+         *
+         *
+         * **If this BroadcastReceiver was launched through a &lt;receiver&gt; tag,
+         * then the object is no longer alive after returning from this
+         * function.** This means you should not perform any operations that
+         * return a result to you asynchronously. If you need to perform any follow up
+         * background work, schedule a [android.app.job.JobService] with
+         * [android.app.job.JobScheduler].
+         *
+         * If you wish to interact with a service that is already running and previously
+         * bound using [bindService()][android.content.Context.bindService],
+         * you can use [.peekService].
+         *
+         *
+         * The Intent filters used in [android.content.Context.registerReceiver]
+         * and in application manifests are *not* guaranteed to be exclusive. They
+         * are hints to the operating system about how to find suitable recipients. It is
+         * possible for senders to force delivery to specific recipients, bypassing filter
+         * resolution.  For this reason, [onReceive()][.onReceive]
+         * implementations should respond only to known actions, ignoring any unexpected
+         * Intents that they may receive.
+         *
+         * @param context The Context in which the receiver is running.
+         * @param intent The Intent being received.
+         */
+        override fun onReceive(context: Context?, intent: Intent?) {
+            var result = ""
+            when (resultCode) {
+                Activity.RESULT_OK -> {
+                    result = " Transmission successful "
+                    textViewSent.setTextColor(Color.GREEN)
+                }
+                SmsManager.RESULT_ERROR_GENERIC_FAILURE -> {
+                    result = " Transmission failed "
+                    textViewSent.setTextColor(Color.RED)
+                }
+                SmsManager.RESULT_ERROR_RADIO_OFF -> {
+                    result = " Radio off "
+                    textViewSent.setTextColor(Color.RED)
+                }
+                SmsManager.RESULT_ERROR_NULL_PDU -> {
+                    result = " No PDU defined "
+                    textViewSent.setTextColor(Color.RED)
+                }
+                SmsManager.RESULT_ERROR_NO_SERVICE -> {
+                    result = " No service "
+                    textViewSent.setTextColor(Color.RED)
+                }
+            }
+            textViewSent.append(result)
+            Toast.makeText(
+                applicationContext, result,
+                Toast.LENGTH_LONG
+            ).show()
+
+        }
+    }
+
+    lateinit var subscriptionInfoList: List<SubscriptionInfo>
+    lateinit var smsManager: SmsManager
     private fun proggy() {
-        button.isEnabled = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.SEND_SMS
-        ) == PackageManager.PERMISSION_GRANTED
+        val listSIM: ArrayList<String> = arrayListOf()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+            try {
+                subscriptionInfoList =
+                    (getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as SubscriptionManager).activeSubscriptionInfoList
+            } catch (e: SecurityException) {
+                e.printStackTrace()
+            }
+            Log.d("SMS_SubscrServ", "$subscriptionInfoList")
+        } else {
+            TODO("VERSION.SDK_INT < LOLLIPOP_MR1")
+        }
+        if (subscriptionInfoList.isNullOrEmpty()) {
+            spinner.visibility = View.GONE
+            smsManager = SmsManager.getDefault()
+        } else {
+            subscriptionInfoList.forEach {
+                listSIM.add("${it.subscriptionId}: ${it.displayName}")
+            }
+            val spiAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, listSIM)
+            spiAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            spinner.adapter = spiAdapter
+        }
+        Log.d("SMS_simList", "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq $listSIM")
+        //val sentIntent = Intent(SENT)
+        /*Create Pending Intents*/
+        val sentPI = PendingIntent.getBroadcast(
+            this, 0, Intent(SENT),
+            PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        //val deliveryIntent = Intent(DELIVERED)
+        val deliverPI = PendingIntent.getBroadcast(
+            this, 0, Intent(DELIVERED),
+            PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        if (!::smsManager.isInitialized) {
+            Log.d(
+                "SMS_isIni",
+                "smsManager is NOT Inittialized!!! spinner.selectedItemId.toInt()=${spinner.selectedItemId.toInt()} subscriptionInfoList[spinner.selectedItemId.toInt()]\n" +
+                        "                        .subscriptionId: ${subscriptionInfoList[spinner.selectedItemId.toInt()].subscriptionId}"
+            )
+        } else {
+            Log.d(
+                "SMS_isIni",
+                "smsManager is Inittialized!!! spinner.selectedItemId.toInt()=${spinner.selectedItemId.toInt()} subscriptionInfoList[spinner.selectedItemId.toInt()]\n" +
+                        "                        .subscriptionId: ${subscriptionInfoList[spinner.selectedItemId.toInt()].subscriptionId}"
+            )
+        }
+        /* Register for SMS send action */
+        registerReceiver(sentRecObj, IntentFilter(SENT))
+        registerReceiver(delivRecObj, IntentFilter(DELIVERED))
+
+        button.isEnabled = true
         button.setOnClickListener {
 
 /*            val intent = Intent(Intent.ACTION_SENDTO)
@@ -138,147 +350,9 @@ class MainActivity : AppCompatActivity() {
             textViewRecieved.text = ""
             textViewSent.text = ""
 
-            val SENT = "sent"
-            val DELIVERED = "delivered"
-            val sentIntent = Intent(SENT)
-            /*Create Pending Intents*/
-            val sentPI = PendingIntent.getBroadcast(
-                applicationContext, 0, sentIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            val deliveryIntent = Intent(DELIVERED)
-            val deliverPI = PendingIntent.getBroadcast(
-                applicationContext, 0, deliveryIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT
-            )
-
-            /* Register for SMS send action */
-            registerReceiver(object : BroadcastReceiver() {
-                /**
-                 * This method is called when the BroadcastReceiver is receiving an Intent
-                 * broadcast.  During this time you can use the other methods on
-                 * BroadcastReceiver to view/modify the current result values.  This method
-                 * is always called within the main thread of its process, unless you
-                 * explicitly asked for it to be scheduled on a different thread using
-                 * [android.content.Context.registerReceiver]. When it runs on the main
-                 * thread you should
-                 * never perform long-running operations in it (there is a timeout of
-                 * 10 seconds that the system allows before considering the receiver to
-                 * be blocked and a candidate to be killed). You cannot launch a popup dialog
-                 * in your implementation of onReceive().
-                 *
-                 *
-                 * **If this BroadcastReceiver was launched through a &lt;receiver&gt; tag,
-                 * then the object is no longer alive after returning from this
-                 * function.** This means you should not perform any operations that
-                 * return a result to you asynchronously. If you need to perform any follow up
-                 * background work, schedule a [android.app.job.JobService] with
-                 * [android.app.job.JobScheduler].
-                 *
-                 * If you wish to interact with a service that is already running and previously
-                 * bound using [bindService()][android.content.Context.bindService],
-                 * you can use [.peekService].
-                 *
-                 *
-                 * The Intent filters used in [android.content.Context.registerReceiver]
-                 * and in application manifests are *not* guaranteed to be exclusive. They
-                 * are hints to the operating system about how to find suitable recipients. It is
-                 * possible for senders to force delivery to specific recipients, bypassing filter
-                 * resolution.  For this reason, [onReceive()][.onReceive]
-                 * implementations should respond only to known actions, ignoring any unexpected
-                 * Intents that they may receive.
-                 *
-                 * @param context The Context in which the receiver is running.
-                 * @param intent The Intent being received.
-                 */
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    var result = ""
-                    when (resultCode) {
-                        Activity.RESULT_OK -> {
-                            result = "Transmission successful"
-                            textViewSent.text = result
-                            textViewSent.setTextColor(Color.GREEN)
-                        }
-                        SmsManager.RESULT_ERROR_GENERIC_FAILURE -> {
-                            result = "Transmission failed"
-                            textViewSent.text = result
-                            textViewSent.setTextColor(Color.RED)
-                        }
-                        SmsManager.RESULT_ERROR_RADIO_OFF -> {
-                            result = "Radio off"
-                            textViewSent.text = result
-                            textViewSent.setTextColor(Color.RED)
-                        }
-                        SmsManager.RESULT_ERROR_NULL_PDU -> {
-                            result = "No PDU defined"
-                            textViewSent.text = result
-                            textViewSent.setTextColor(Color.RED)
-                        }
-                        SmsManager.RESULT_ERROR_NO_SERVICE -> {
-                            result = "No service"
-                            textViewSent.text=result
-                            textViewSent.setTextColor(Color.RED)
-                        }
-                    }
-                    Toast.makeText(
-                        applicationContext, result,
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }, IntentFilter(SENT))
-
-            registerReceiver(object : BroadcastReceiver() {
-                /**
-                 * This method is called when the BroadcastReceiver is receiving an Intent
-                 * broadcast.  During this time you can use the other methods on
-                 * BroadcastReceiver to view/modify the current result values.  This method
-                 * is always called within the main thread of its process, unless you
-                 * explicitly asked for it to be scheduled on a different thread using
-                 * [android.content.Context.registerReceiver]. When it runs on the main
-                 * thread you should
-                 * never perform long-running operations in it (there is a timeout of
-                 * 10 seconds that the system allows before considering the receiver to
-                 * be blocked and a candidate to be killed). You cannot launch a popup dialog
-                 * in your implementation of onReceive().
-                 *
-                 *
-                 * **If this BroadcastReceiver was launched through a &lt;receiver&gt; tag,
-                 * then the object is no longer alive after returning from this
-                 * function.** This means you should not perform any operations that
-                 * return a result to you asynchronously. If you need to perform any follow up
-                 * background work, schedule a [android.app.job.JobService] with
-                 * [android.app.job.JobScheduler].
-                 *
-                 * If you wish to interact with a service that is already running and previously
-                 * bound using [bindService()][android.content.Context.bindService],
-                 * you can use [.peekService].
-                 *
-                 *
-                 * The Intent filters used in [android.content.Context.registerReceiver]
-                 * and in application manifests are *not* guaranteed to be exclusive. They
-                 * are hints to the operating system about how to find suitable recipients. It is
-                 * possible for senders to force delivery to specific recipients, bypassing filter
-                 * resolution.  For this reason, [onReceive()][.onReceive]
-                 * implementations should respond only to known actions, ignoring any unexpected
-                 * Intents that they may receive.
-                 *
-                 * @param context The Context in which the receiver is running.
-                 * @param intent The Intent being received.
-                 */
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    Toast.makeText(
-                        applicationContext, "Deliverd",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    textViewRecieved.text="Delivered"
-                    textViewRecieved.setTextColor(Color.GREEN)
-                }
-            }, IntentFilter(DELIVERED))
-
-
             val smsText = editTextText.text.toString()
             val phoneNumber = editTextTextPhoneNumber.text.toString()
-            if (smsText.isNullOrBlank()) {
+            if (smsText.isBlank()) {
                 Toast.makeText(
                     this,
                     "Empty text of message. Cannot send empty sms",
@@ -286,19 +360,55 @@ class MainActivity : AppCompatActivity() {
                 ).show()
                 return@setOnClickListener
             }
-            if ((!phoneNumber.isNullOrBlank()) and phoneNumber.matches("^\\+?[0-9][0-9 \\-()]*".toRegex())) {
-                val smsManager: SmsManager? = SmsManager.getDefault()
-                if (smsManager == null)
+
+            if (!::smsManager.isInitialized) {
+                smsManager = SmsManager.getSmsManagerForSubscriptionId(
+                    subscriptionInfoList[spinner.selectedItemId.toInt()]
+                        .subscriptionId
+                )
+                Log.d(
+                    "SMS_isIni",
+                    "spinner.selectedItemId.toInt()=${spinner.selectedItemId.toInt()} subscriptionInfoList[spinner.selectedItemId.toInt()]\n" +
+                            "                        .subscriptionId: ${subscriptionInfoList[spinner.selectedItemId.toInt()].subscriptionId}"
+                )
+            }
+            val smsArray = smsManager.divideMessage(smsText)
+            val sentPIlist = ArrayList<PendingIntent>()
+            val recvPIlist = ArrayList<PendingIntent>()
+            smsArray.forEach { _ ->
+                sentPIlist.add(
+                    PendingIntent.getBroadcast(
+                        this, 0, Intent(SENT),
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                    )
+                )
+                recvPIlist.add(
+                    PendingIntent.getBroadcast(
+                        this, 0, Intent(DELIVERED),
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                    )
+                )
+            }
+
+            if ((!phoneNumber.isBlank()) and phoneNumber.matches("^\\+?[0-9][0-9 \\-()]*".toRegex())) {
+                smsManager.sendMultipartTextMessage(
+                    phoneNumber,
+                    null,
+                    smsArray,
+                    sentPIlist,
+                    recvPIlist
+                )
+                /*if (smsManager == null)
                     Toast.makeText(this, getString(R.string.no_smsmanager), Toast.LENGTH_LONG)
                         .show()
 
                 smsManager?.sendTextMessage(
-                    editTextTextPhoneNumber.text.toString(),
+                    phoneNumber,
                     null,
-                    editTextText.text.toString(),
+                    smsText,
                     sentPI, deliverPI
                 )
-                smsManager?.divideMessage("qweqwe")
+                smsManager?.divideMessage("qweqwe")*/
             } else {
                 Toast.makeText(this, getString(R.string.wrong_phone_number), Toast.LENGTH_LONG)
                     .show()
@@ -306,12 +416,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-/*    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
+    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(
             baseContext, it
         ) == PackageManager.PERMISSION_GRANTED
-    }*/
+    }
 
+    override fun onDestroy() {
+        try {
+            unregisterReceiver(sentRecObj)
+            unregisterReceiver(delivRecObj)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        super.onDestroy()
+    }
     /**
      * Callback for the result from requesting permissions. This method
      * is invoked for every call on [.requestPermissions].

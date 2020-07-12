@@ -24,22 +24,32 @@
         android:inputType="textMultiLine|text"
         android:lines="6" />
 
+    <Spinner
+        android:id="@+id/spinner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="4dp" />
+
     <Button
         android:id="@+id/button"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
         android:text="@string/button" />
 
     <TextView
         android:id="@+id/textViewSent"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:freezesText="true"
         tools:text="SMS Sent" />
 
     <TextView
         android:id="@+id/textViewRecieved"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:freezesText="true"
         tools:text="SMS Recieved" />
 
 </LinearLayout>
