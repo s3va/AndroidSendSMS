@@ -16,7 +16,6 @@ import android.telephony.SubscriptionInfo
 import android.telephony.SubscriptionManager
 import android.util.Log
 import android.view.View
-import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -280,36 +279,37 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    lateinit var subscriptionInfoList: List<SubscriptionInfo>
-    lateinit var smsManager: SmsManager
+    private lateinit var subscriptionInfoList: List<SubscriptionInfo>
+    private lateinit var smsManager: SmsManager
     private fun proggy() {
         val listSIM: ArrayList<String> = arrayListOf()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
             try {
                 subscriptionInfoList =
                     (getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as SubscriptionManager).activeSubscriptionInfoList
+
+                if (subscriptionInfoList.isNullOrEmpty()) {
+                    spinner.visibility = View.GONE
+                    smsManager = SmsManager.getDefault()
+                } else {
+                    subscriptionInfoList.forEach {
+                        listSIM.add("${it.subscriptionId}: ${it.displayName}")
+                    }
+                    val spiAdapter =
+                        ArrayAdapter(this, android.R.layout.simple_spinner_item, listSIM)
+                    spiAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                    spinner.adapter = spiAdapter
+                }
             } catch (e: SecurityException) {
                 e.printStackTrace()
             }
             Log.d("SMS_SubscrServ", "$subscriptionInfoList")
-        } else {
-            TODO("VERSION.SDK_INT < LOLLIPOP_MR1")
-        }
-        if (subscriptionInfoList.isNullOrEmpty()) {
-            spinner.visibility = View.GONE
-            smsManager = SmsManager.getDefault()
-        } else {
-            subscriptionInfoList.forEach {
-                listSIM.add("${it.subscriptionId}: ${it.displayName}")
-            }
-            val spiAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, listSIM)
-            spiAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-            spinner.adapter = spiAdapter
-        }
+        } 
+
         Log.d("SMS_simList", "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq $listSIM")
         //val sentIntent = Intent(SENT)
         /*Create Pending Intents*/
-        val sentPI = PendingIntent.getBroadcast(
+/*        val sentPI = PendingIntent.getBroadcast(
             this, 0, Intent(SENT),
             PendingIntent.FLAG_UPDATE_CURRENT
         )
@@ -317,20 +317,8 @@ class MainActivity : AppCompatActivity() {
         val deliverPI = PendingIntent.getBroadcast(
             this, 0, Intent(DELIVERED),
             PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        if (!::smsManager.isInitialized) {
-            Log.d(
-                "SMS_isIni",
-                "smsManager is NOT Inittialized!!! spinner.selectedItemId.toInt()=${spinner.selectedItemId.toInt()} subscriptionInfoList[spinner.selectedItemId.toInt()]\n" +
-                        "                        .subscriptionId: ${subscriptionInfoList[spinner.selectedItemId.toInt()].subscriptionId}"
-            )
-        } else {
-            Log.d(
-                "SMS_isIni",
-                "smsManager is Inittialized!!! spinner.selectedItemId.toInt()=${spinner.selectedItemId.toInt()} subscriptionInfoList[spinner.selectedItemId.toInt()]\n" +
-                        "                        .subscriptionId: ${subscriptionInfoList[spinner.selectedItemId.toInt()].subscriptionId}"
-            )
-        }
+        )*/
+
         /* Register for SMS send action */
         registerReceiver(sentRecObj, IntentFilter(SENT))
         registerReceiver(delivRecObj, IntentFilter(DELIVERED))
@@ -361,16 +349,19 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            if (!::smsManager.isInitialized) {
-                smsManager = SmsManager.getSmsManagerForSubscriptionId(
-                    subscriptionInfoList[spinner.selectedItemId.toInt()]
-                        .subscriptionId
-                )
-                Log.d(
-                    "SMS_isIni",
-                    "spinner.selectedItemId.toInt()=${spinner.selectedItemId.toInt()} subscriptionInfoList[spinner.selectedItemId.toInt()]\n" +
-                            "                        .subscriptionId: ${subscriptionInfoList[spinner.selectedItemId.toInt()].subscriptionId}"
-                )
+            if (listSIM.isNotEmpty()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+                    smsManager = SmsManager.getSmsManagerForSubscriptionId(
+                        subscriptionInfoList[spinner.selectedItemId.toInt()]
+                            .subscriptionId
+                    )
+                    Log.d(
+                        "SMS_isIni",
+                        "spinner.selectedItemId.toInt()=${spinner.selectedItemId.toInt()} subscriptionInfoList[spinner.selectedItemId.toInt()]\n" +
+                                "                        .subscriptionId: ${subscriptionInfoList[spinner.selectedItemId.toInt()].subscriptionId}"
+                    )
+                }
+
             }
             val smsArray = smsManager.divideMessage(smsText)
             val sentPIlist = ArrayList<PendingIntent>()
@@ -441,9 +432,9 @@ class MainActivity : AppCompatActivity() {
      * and results arrays which should be treated as a cancellation.
      *
      *
-     * @param requestCode The request code passed in [.requestPermissions].
-     * @param permissions The requested permissions. Never null.
-     * @param grantResults The grant results for the corresponding permissions
+     * @param #requestCode The request code passed in [.requestPermissions].
+     * @param #permissions The requested permissions. Never null.
+     * @param #grantResults The grant results for the corresponding permissions
      * which is either [android.content.pm.PackageManager.PERMISSION_GRANTED]
      * or [android.content.pm.PackageManager.PERMISSION_DENIED]. Never null.
      *
