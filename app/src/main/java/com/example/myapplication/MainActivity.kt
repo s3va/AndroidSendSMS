@@ -304,7 +304,7 @@ class MainActivity : AppCompatActivity() {
                 e.printStackTrace()
             }
             Log.d("SMS_SubscrServ", "$subscriptionInfoList")
-        } 
+        }
 
         Log.d("SMS_simList", "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq $listSIM")
         //val sentIntent = Intent(SENT)
@@ -362,6 +362,8 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
 
+            } else {
+                smsManager= SmsManager.getDefault()
             }
             val smsArray = smsManager.divideMessage(smsText)
             val sentPIlist = ArrayList<PendingIntent>()
